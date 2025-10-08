@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>每日任务打卡</title>
+    <link rel="stylesheet" href="DailyTasks.css">
+</head>
+<body>
+    <img id="bg-image" alt="">
+
+    <div class="sidebar">
+        <div class="sidebar-top">
+            <div class="sidebar-logo">
+                <span class="emoji">📋</span>
+                <span class="gradient-text">任务管理</span>
+            </div>
+            <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="折叠侧边栏">⟨</button>
+        </div>
+        <div class="sidebar-nav">
+            <div class="nav-item active" onclick="switchPage('home')" title="首页">
+                <span class="nav-icon">🏠</span>
+                <span class="nav-label">首页</span>
+            </div>
+            <div class="nav-item" onclick="switchPage('calendar')" title="每日">
+                <span class="nav-icon">📅</span>
+                <span class="nav-label">每日</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <!-- 首页 -->
+        <div id="homePage" class="page active">
+            <div class="container">
+                <div class="header-info">
+                    <div class="datetime-display">
+                        <div class="current-date" id="currentDate"></div>
+                        <div class="current-time" id="currentTime"></div>
+                    </div>
+                    <div class="countdown-display">
+                        <div class="countdown-label" onclick="openCountdownModal()" title="点击设置">
+                            ⏳ <span id="countdownLabel">目标倒计时</span>
+                        </div>
+                        <div class="countdown-value" id="countdownValue">未设置</div>
+                    </div>
+                </div>
+
+                <header>
+                    <h1>
+                        <span class="emoji">📋</span>
+                        <span class="gradient-text">每日任务打卡</span>
+                    </h1>
+                    <p class="subtitle">翻转卡片查看详情 · 点击标记完成状态</p>
+                </header>
+
+                <div class="controls">
+                    <button onclick="openAddModal()">➕ 添加任务</button>
+                    <button class="btn-secondary" onclick="showRings()">🔄 今日三环</button>
+                    <button class="btn-secondary" onclick="toggleTheme()">🌓 切换主题</button>
+                    <button class="btn-secondary" onclick="document.getElementById('bg-upload').click()">🖼️ 自定义背景</button>
+                    <input type="file" id="bg-upload" accept="image/*" onchange="handleBgUpload(event)">
+                </div>
+                <div class="board-layout">
+                    <div class="tasks-column">
+                        <div class="task-summary-bar">
+                            <div class="task-date" id="activeTaskDate"></div>
+                            <div class="task-summary-actions">
+                                <span class="task-stats" id="taskStats"></span>
+                                <button type="button" class="btn-tertiary" id="backToToday" onclick="setActiveDate(getTodayKey())">回到今日</button>
+                            </div>
+                        </div>
+                        <div class="tasks-grid" id="tasksGrid"></div>
+                    </div>
+                    <aside class="preset-sidebar" id="presetSidebar">
+                        <div class="preset-header">
+                            <div class="preset-title-wrap">
+                                <span class="preset-title">预设任务</span>
+                                <span class="preset-subtitle">收藏你的常用任务</span>
+                            </div>
+                            <button type="button" class="preset-toggle" id="presetToggle" aria-label="折叠预设栏">⟩</button>
+                        </div>
+                        <div class="preset-toolbar">
+                            <button type="button" class="preset-add" onclick="openPresetModal()">➕ 新建预设</button>
+                        </div>
+                        <div class="preset-list" id="presetList"></div>
+                    </aside>
+                </div>
+            </div>
+        </div>
+
+        <!-- 日历页面 -->
+        <div id="calendarPage" class="page">
+            <div class="container">
+                <div class="calendar-container">
+                    <div class="calendar-header">
+                        <h1 class="calendar-title" id="calendarTitle"></h1>
+                        <div class="calendar-nav">
+                            <button class="nav-btn" onclick="changeMonth(-1)">◀</button>
+                            <button class="btn-secondary" onclick="goToToday()">今天</button>
+                            <button class="nav-btn" onclick="changeMonth(1)">▶</button>
+                        </div>
+                    </div>
+                    <div class="calendar-grid">
+                        <div class="calendar-weekdays">
+                            <div class="weekday">日</div>
+                            <div class="weekday">一</div>
+                            <div class="weekday">二</div>
+                            <div class="weekday">三</div>
+                            <div class="weekday">四</div>
+                            <div class="weekday">五</div>
+                            <div class="weekday">六</div>
+                        </div>
+                        <div class="calendar-days" id="calendarDays"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 三环页面 -->
+    <div class="rings-page" id="ringsPage">
+        <div class="rings-container">
+            <h2 class="rings-title">
+                <span class="emoji">🔄</span>
+                <span class="gradient-text">今日三环</span>
+            </h2>
+            <div class="activity-rings">
+                <svg class="activity-rings-svg" viewBox="0 0 360 360" aria-hidden="true">
+                    <defs>
+                        <linearGradient id="healthGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#ff3b5f" />
+                            <stop offset="100%" stop-color="#ff005d" />
+                        </linearGradient>
+                        <linearGradient id="knowledgeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#32d270" />
+                            <stop offset="100%" stop-color="#0fb37b" />
+                        </linearGradient>
+                        <linearGradient id="expGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#5ac8fa" />
+                            <stop offset="100%" stop-color="#0a84ff" />
+                        </linearGradient>
+                    </defs>
+                    <g class="ring-group ring-group-health">
+                        <circle class="ring-track" cx="180" cy="180" r="150"></circle>
+                        <circle class="ring-progress" cx="180" cy="180" r="150" id="healthRing"></circle>
+                    </g>
+                    <g class="ring-group ring-group-knowledge">
+                        <circle class="ring-track" cx="180" cy="180" r="120"></circle>
+                        <circle class="ring-progress" cx="180" cy="180" r="120" id="knowledgeRing"></circle>
+                    </g>
+                    <g class="ring-group ring-group-exp">
+                        <circle class="ring-track" cx="180" cy="180" r="90"></circle>
+                        <circle class="ring-progress" cx="180" cy="180" r="90" id="expRing"></circle>
+                    </g>
+                </svg>
+                <div class="activity-rings-center">
+                    <div class="center-label">今日进度</div>
+                    <div class="center-value" id="ringsSummary">0%</div>
+                </div>
+            </div>
+            <div class="ring-stats">
+                <div class="ring-stat">
+                    <span class="ring-dot health"></span>
+                    <div class="ring-stat-info">
+                        <span class="ring-stat-label">健康</span>
+                        <span class="ring-stat-value" id="healthValue">0 / 30</span>
+                    </div>
+                </div>
+                <div class="ring-stat">
+                    <span class="ring-dot knowledge"></span>
+                    <div class="ring-stat-info">
+                        <span class="ring-stat-label">知识</span>
+                        <span class="ring-stat-value" id="knowledgeValue">0 / 30</span>
+                    </div>
+                </div>
+                <div class="ring-stat">
+                    <span class="ring-dot exp"></span>
+                    <div class="ring-stat-info">
+                        <span class="ring-stat-label">经验</span>
+                        <span class="ring-stat-value" id="expValue">0 / 30</span>
+                    </div>
+                </div>
+            </div>
+            <button class="close-rings" onclick="hideRings()">返回</button>
+        </div>
+    </div>
+
+    <!-- 添加任务模态框 -->
+    <div id="addModal" class="modal">
+        <div class="modal-content">
+            <h2 id="addModalTitle">添加新任务</h2>
+            <form id="addTaskForm">
+                <p class="form-subtitle" id="addModalDateHint"></p>
+                <div class="form-group">
+                    <label for="taskTitle">任务名称</label>
+                    <input type="text" id="taskTitle" required placeholder="例如：晨跑30分钟">
+                </div>
+                <div class="form-group">
+                    <label for="taskDesc">任务描述</label>
+                    <textarea id="taskDesc" placeholder="详细说明任务内容..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="taskIcon">图标 (emoji)</label>
+                    <input type="text" id="taskIcon" placeholder="🏃" maxlength="3" autocomplete="off">
+                    <div class="emoji-helper">
+                        <div class="emoji-helper-header">
+                            <span>推荐</span>
+                            <button type="button" class="emoji-refresh" id="emojiShuffle" title="换一批">🎲</button>
+                        </div>
+                        <div class="emoji-suggestion-list" id="emojiSuggestions"></div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>关联三环</label>
+                    <div class="ring-option-group">
+                        <label class="ring-option">
+                            <input type="checkbox" name="taskRings" value="health" checked>
+                            <span>健康值</span>
+                        </label>
+                        <label class="ring-option">
+                            <input type="checkbox" name="taskRings" value="knowledge">
+                            <span>知识值</span>
+                        </label>
+                        <label class="ring-option">
+                            <input type="checkbox" name="taskRings" value="exp">
+                            <span>经验值</span>
+                        </label>
+                    </div>
+                    <p class="form-hint">每完成一次任务，将为勾选的圆环增加指定数值。</p>
+                </div>
+                <div class="form-group">
+                    <label for="taskRingValue">环值增量 (默认 10)</label>
+                    <input type="number" id="taskRingValue" min="1" max="30" step="1" value="10">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary" onclick="closeAddModal()">取消</button>
+                    <button type="submit">确认添加</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 倒计时设置模态框 -->
+    <div id="countdownModal" class="modal">
+        <div class="modal-content">
+            <h2>设置倒计时</h2>
+            <form id="countdownForm">
+                <div class="form-group">
+                    <label for="countdownEventName">事件名称</label>
+                    <input type="text" id="countdownEventName" required placeholder="例如：考试日期">
+                </div>
+                <div class="form-group">
+                    <label for="countdownDate">目标日期</label>
+                    <input type="date" id="countdownDate" required>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary" onclick="closeCountdownModal()">取消</button>
+                    <button type="submit">确认设置</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="confirmModal" class="modal">
+        <div class="modal-content confirm-modal-content" role="dialog" aria-modal="true" aria-labelledby="confirmMessage">
+            <h2>确认操作</h2>
+            <p id="confirmMessage">确定要删除这个任务吗？</p>
+            <div class="modal-actions confirm-actions">
+                <button type="button" class="btn-secondary" id="confirmCancel">取消</button>
+                <button type="button" class="btn-danger" id="confirmOk">删除</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js" defer></script>
+    <script src="DailyTasks.js"></script>
+</body>
+</html>
