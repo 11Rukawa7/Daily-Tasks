@@ -58,6 +58,8 @@
                     <button onclick="openAddModal()">➕ 添加任务</button>
                     <button class="btn-secondary" onclick="showRings()">🔄 今日三环</button>
                     <button class="btn-secondary" onclick="toggleTheme()">🌓 切换主题</button>
+                    <button class="btn-secondary" onclick="openDataModal('export')">📤 导出数据</button>
+                    <button class="btn-secondary" onclick="openDataModal('import')">📥 导入数据</button>
                     <button class="btn-secondary" onclick="document.getElementById('bg-upload').click()">🖼️ 自定义背景</button>
                     <input type="file" id="bg-upload" accept="image/*" onchange="handleBgUpload(event)">
                 </div>
@@ -235,7 +237,7 @@
                 </div>
                 <div class="modal-actions">
                     <button type="button" class="btn-secondary" onclick="closeAddModal()">取消</button>
-                    <button type="submit">确认添加</button>
+                    <button type="submit" id="addModalSubmit">确认添加</button>
                 </div>
             </form>
         </div>
@@ -259,6 +261,31 @@
                     <button type="submit">确认设置</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <div id="dataModal" class="modal">
+        <div class="modal-content data-modal-content">
+            <h2>数据导入导出</h2>
+            <div class="data-section data-section-export" id="dataExportSection">
+                <h3>📤 导出数据</h3>
+                <p class="form-hint">生成包含任务、预设、历史记录等内容的备份，可复制或下载以便跨设备同步。</p>
+                <textarea class="data-textarea" id="dataExportTextarea" readonly></textarea>
+                <div class="data-actions">
+                    <button type="button" class="btn-secondary" id="dataCopyBtn">复制内容</button>
+                    <button type="button" class="btn-secondary" id="dataDownloadBtn">下载 JSON</button>
+                </div>
+            </div>
+            <div class="data-section data-section-import" id="dataImportSection">
+                <h3>📥 导入数据</h3>
+                <p class="form-hint">选择 JSON 文件或粘贴备份内容，导入后将覆盖当前数据，请先备份。</p>
+                <input type="file" id="dataImportFile" accept="application/json">
+                <textarea class="data-textarea" id="dataImportTextarea" placeholder="在此粘贴要导入的备份数据..."></textarea>
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary" onclick="closeDataModal()">取消</button>
+                    <button type="button" onclick="handleImportData()">导入数据</button>
+                </div>
+            </div>
         </div>
     </div>
 

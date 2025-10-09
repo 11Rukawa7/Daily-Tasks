@@ -715,6 +715,31 @@ button:active {
     border-color: rgba(251, 191, 36, 0.35);
 }
 
+.edit-icon-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(59, 130, 246, 0.15);
+    color: var(--accent-color);
+    font-size: 1rem;
+    font-weight: 600;
+    padding: 0;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: none;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.edit-icon-btn:hover {
+    background: rgba(59, 130, 246, 0.28);
+    color: #1d4ed8;
+    transform: translateY(-1px);
+}
+
 .delete-icon-btn {
     width: 36px;
     height: 36px;
@@ -833,6 +858,7 @@ button:active {
     opacity: 0.8;
 }
 
+.preset-edit,
 .card-footer {
     margin-top: auto;
     display: flex;
@@ -850,6 +876,15 @@ button:active {
 }
 
 .delete-btn:hover {
+
+.preset-edit {
+    background: rgba(59, 130, 246, 0.08);
+    color: var(--accent-color);
+}
+
+.preset-edit:hover {
+    background: rgba(59, 130, 246, 0.18);
+}
     background: rgba(239, 68, 68, 0.3);
 }
 
@@ -1230,6 +1265,65 @@ button:active {
     width: 90%;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
     animation: scaleIn 0.3s ease;
+}
+
+.data-modal-content {
+    max-width: 720px;
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+}
+
+.data-section h3 {
+    font-size: 1.2rem;
+    margin-bottom: 0.75rem;
+    color: var(--text-primary);
+}
+
+.data-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.data-section-active {
+    border: 1px solid rgba(59, 130, 246, 0.35);
+    border-radius: 18px;
+    padding: 1.25rem;
+    background: rgba(59, 130, 246, 0.08);
+}
+
+.data-textarea {
+    min-height: 160px;
+    font-family: 'Fira Code', 'Consolas', 'Courier New', monospace;
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
+.data-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+#dataImportFile {
+    padding: 0.65rem;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    border: 2px dashed rgba(255, 255, 255, 0.12);
+    cursor: pointer;
+    color: var(--text-secondary);
+}
+
+#dataImportFile::-webkit-file-upload-button {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 10px;
+    background: var(--accent-color);
+    color: #fff;
+    cursor: pointer;
+    margin-right: 1rem;
 }
 
 .confirm-modal-content {

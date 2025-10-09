@@ -9,6 +9,9 @@ const PRESET_KEY = 'presetTasks';
 const LAST_ACTIVE_DATE_KEY = 'lastActiveDate';
 const RIGHTBAR_COLLAPSED_KEY = 'presetCollapsed';
 
+const EXPORT_VERSION = 1;
+const EXPORT_FILENAME_PREFIX = 'daily-tasks-backup';
+
 const DEFAULT_RING_VALUE = 10;
 const RING_TARGET = 30;
 const RING_LABELS = {
@@ -173,6 +176,8 @@ let lastSystemDateKey = getTodayKey();
 let addModalMode = 'task';
 let addModalTargetDate = selectedDateKey;
 let confirmDialogResolver = null;
+let editingTaskId = null;
+let editingPresetId = null;
 
 function formatReward(rings, ringValue) {
     if (!Array.isArray(rings) || rings.length === 0) {
@@ -570,6 +575,7 @@ function renderPresetTasks() {
             </div>
             <div class="preset-actions">
                 <button type="button" class="preset-apply" data-preset-id="${preset.id}">添加</button>
+                <button type="button" class="preset-edit" data-preset-id="${preset.id}">编辑</button>
                 <button type="button" class="preset-delete" data-preset-id="${preset.id}">删除</button>
             </div>
         `;
@@ -580,7 +586,7 @@ function renderPresetTasks() {
     container.querySelectorAll('.preset-card').forEach(card => {
         card.addEventListener('click', (event) => {
             const target = event.target;
-            if (target.closest('.preset-delete')) {
+            if (target.closest('.preset-delete') || target.closest('.preset-edit')) {
                 return;
             }
             const id = Number(card.dataset.presetId);
@@ -601,6 +607,14 @@ function renderPresetTasks() {
             event.stopPropagation();
             const id = Number(event.currentTarget.dataset.presetId);
             deletePresetTask(id);
+        });
+    });
+
+    container.querySelectorAll('.preset-edit').forEach(button => {
+        button.addEventListener('click', (event) => {
+            event.stopPropagation();
+            const id = Number(event.currentTarget.dataset.presetId);
+            openAddModal({ mode: 'preset-edit', presetId: id });
         });
     });
 }
@@ -659,6 +673,7 @@ function renderTasks() {
                             <button class="lock-btn${task.locked ? ' locked' : ''}" data-task-id="${task.id}" title="${task.locked ? '点击解锁' : '点击锁定，跨日保留任务'}">
                                 ${task.locked ? '🔒' : '🔓'}
                             </button>
+                            <button class="edit-icon-btn" data-task-id="${task.id}" title="编辑任务">✏️</button>
                             <button class="delete-icon-btn" data-task-id="${task.id}" title="删除任务">🗑️</button>
                         </div>
                     </div>
@@ -678,6 +693,7 @@ function renderTasks() {
                             <button class="lock-btn${task.locked ? ' locked' : ''}" data-task-id="${task.id}" title="${task.locked ? '点击解锁' : '点击锁定，跨日保留任务'}">
                                 ${task.locked ? '🔒' : '🔓'}
                             </button>
+                            <button class="edit-icon-btn" data-task-id="${task.id}" title="编辑任务">✏️</button>
                             <button class="undo-btn" data-task-id="${task.id}" title="撤销到未完成">↺ 撤销</button>
                         </div>
                     </div>
@@ -739,6 +755,15 @@ function renderTasks() {
                 event.stopPropagation();
                 const { taskId } = event.currentTarget.dataset;
                 toggleTaskLock(Number(taskId));
+            });
+        });
+
+        const editButtons = wrapper.querySelectorAll('.edit-icon-btn');
+        editButtons.forEach(btn => {
+            btn.addEventListener('click', (event) => {
+                event.stopPropagation();
+                const { taskId } = event.currentTarget.dataset;
+                openAddModal({ mode: 'task-edit', taskId: Number(taskId), dateKey: selectedDateKey });
             });
         });
 
@@ -1147,27 +1172,62 @@ function onCalendarDateSelect(dateKey) {
 
 // 添加任务
 function openAddModal(options = {}) {
+    resetAddTaskForm();
+
     addModalMode = options.mode || 'task';
     addModalTargetDate = options.dateKey || selectedDateKey;
 
-    resetAddTaskForm();
+    if (addModalMode === 'task-edit') {
+        editingTaskId = Number(options.taskId);
+    } else if (addModalMode === 'preset-edit') {
+        editingPresetId = Number(options.presetId);
+    }
 
     const modal = document.getElementById('addModal');
     modal.classList.add('active');
 
     const titleEl = document.getElementById('addModalTitle');
     if (titleEl) {
-        titleEl.textContent = addModalMode === 'preset' ? '添加预设任务' : '添加新任务';
+        let titleText = '添加新任务';
+        if (addModalMode === 'preset') {
+            titleText = '添加预设任务';
+        } else if (addModalMode === 'task-edit') {
+            titleText = '编辑任务';
+        } else if (addModalMode === 'preset-edit') {
+            titleText = '编辑预设任务';
+        }
+        titleEl.textContent = titleText;
     }
 
     const dateHint = document.getElementById('addModalDateHint');
     if (dateHint) {
         if (addModalMode === 'preset') {
             dateHint.textContent = '保存为常用模板，随时快速复用。';
+        } else if (addModalMode === 'preset-edit') {
+            dateHint.textContent = '编辑预设任务内容。';
         } else {
             const label = formatDateLabel(addModalTargetDate);
-            dateHint.textContent = `目标日期：${label}`;
+            dateHint.textContent = addModalMode === 'task-edit'
+                ? `编辑任务 · ${label}`
+                : `目标日期：${label}`;
         }
+    }
+
+    const submitBtn = document.getElementById('addModalSubmit');
+    if (submitBtn) {
+        submitBtn.textContent = addModalMode === 'task-edit' || addModalMode === 'preset-edit'
+            ? '保存修改'
+            : '确认添加';
+    }
+
+    if (addModalMode === 'task-edit' && Number.isFinite(editingTaskId)) {
+        const targetDate = addModalTargetDate || selectedDateKey;
+        const taskList = ensureDateCollection(targetDate);
+        const task = taskList.find(item => item.id === editingTaskId);
+        populateTaskFormFromData(task);
+    } else if (addModalMode === 'preset-edit' && Number.isFinite(editingPresetId)) {
+        const preset = presetTasks.find(item => item.id === editingPresetId);
+        populateTaskFormFromData(preset);
     }
 
     setTimeout(() => {
@@ -1206,6 +1266,374 @@ function resetAddTaskForm() {
         iconInput.value = '';
         iconInput.dispatchEvent(new Event('input'));
     }
+
+    const submitBtn = document.getElementById('addModalSubmit');
+    if (submitBtn) {
+        submitBtn.textContent = '确认添加';
+    }
+
+    editingTaskId = null;
+    editingPresetId = null;
+}
+
+function resetDataModalFields() {
+    const importTextarea = document.getElementById('dataImportTextarea');
+    if (importTextarea) {
+        importTextarea.value = '';
+    }
+
+    const importFileInput = document.getElementById('dataImportFile');
+    if (importFileInput) {
+        importFileInput.value = '';
+    }
+}
+
+function collectExportPayload() {
+    const normalizedTasksByDate = {};
+    Object.entries(tasksByDate || {}).forEach(([dateKey, list]) => {
+        if (Array.isArray(list) && list.length) {
+            normalizedTasksByDate[dateKey] = list.map(normalizeTask);
+        } else {
+            normalizedTasksByDate[dateKey] = [];
+        }
+    });
+
+    const normalizedPresets = Array.isArray(presetTasks)
+        ? presetTasks.map(normalizeTask)
+        : [];
+
+    const historyData = JSON.parse(localStorage.getItem(HISTORY_KEY) || '{}');
+    const countdownData = JSON.parse(localStorage.getItem(COUNTDOWN_KEY) || 'null');
+    const backgroundData = localStorage.getItem(BG_KEY) || null;
+    const theme = document.body.classList.contains('light-theme') ? 'light' : 'dark';
+    const lastActiveDate = localStorage.getItem(LAST_ACTIVE_DATE_KEY) || selectedDateKey;
+    const sidebarCollapsed = document.body.classList.contains('sidebar-collapsed');
+    const presetCollapsed = document.body.classList.contains('preset-collapsed');
+
+    return {
+        app: 'DailyTasks',
+        version: EXPORT_VERSION,
+        exportedAt: new Date().toISOString(),
+        data: {
+            tasksByDate: normalizedTasksByDate,
+            presetTasks: normalizedPresets,
+            history: historyData,
+            countdown: countdownData,
+            background: backgroundData,
+            theme,
+            lastActiveDate,
+            sidebarCollapsed,
+            presetCollapsed
+        }
+    };
+}
+
+function refreshExportTextarea() {
+    const textarea = document.getElementById('dataExportTextarea');
+    if (!textarea) {
+        return;
+    }
+
+    const payload = collectExportPayload();
+    textarea.value = JSON.stringify(payload, null, 2);
+}
+
+function highlightDataSection(sectionId) {
+    const exportSection = document.getElementById('dataExportSection');
+    const importSection = document.getElementById('dataImportSection');
+    [exportSection, importSection].forEach(section => {
+        if (section) {
+            section.classList.remove('data-section-active');
+        }
+    });
+
+    const targetSection = document.getElementById(sectionId);
+    if (targetSection) {
+        targetSection.classList.add('data-section-active');
+    }
+}
+
+function openDataModal(initialMode = 'export') {
+    const modal = document.getElementById('dataModal');
+    if (!modal) {
+        return;
+    }
+
+    refreshExportTextarea();
+    resetDataModalFields();
+
+    modal.classList.add('active');
+
+    if (initialMode === 'import') {
+        highlightDataSection('dataImportSection');
+        const importSection = document.getElementById('dataImportSection');
+        if (importSection) {
+            importSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        setTimeout(() => {
+            const importTextarea = document.getElementById('dataImportTextarea');
+            if (importTextarea) {
+                importTextarea.focus();
+            }
+        }, 0);
+    } else {
+        highlightDataSection('dataExportSection');
+        setTimeout(() => {
+            const exportTextarea = document.getElementById('dataExportTextarea');
+            if (exportTextarea) {
+                exportTextarea.focus();
+                exportTextarea.select();
+            }
+        }, 0);
+    }
+}
+
+function closeDataModal() {
+    const modal = document.getElementById('dataModal');
+    if (!modal) {
+        return;
+    }
+
+    modal.classList.remove('active');
+    highlightDataSection('');
+    resetDataModalFields();
+}
+
+async function copyExportData() {
+    const textarea = document.getElementById('dataExportTextarea');
+    if (!textarea || !textarea.value) {
+        alert('暂无可复制的导出数据');
+        return;
+    }
+
+    try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(textarea.value);
+        } else {
+            const wasReadOnly = textarea.hasAttribute('readonly');
+            if (wasReadOnly) {
+                textarea.removeAttribute('readonly');
+            }
+            textarea.focus();
+            textarea.select();
+            document.execCommand('copy');
+            window.getSelection().removeAllRanges();
+            if (wasReadOnly) {
+                textarea.setAttribute('readonly', 'readonly');
+            }
+        }
+        alert('导出内容已复制到剪贴板');
+    } catch (error) {
+        console.error('复制导出数据失败:', error);
+        alert('复制失败，请手动复制文本内容');
+    }
+}
+
+function downloadExportData() {
+    const textarea = document.getElementById('dataExportTextarea');
+    if (!textarea || !textarea.value) {
+        alert('暂无可下载的导出数据');
+        return;
+    }
+
+    try {
+        const blob = new Blob([textarea.value], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        const timestamp = new Date().toISOString().split('T')[0];
+        link.href = url;
+        link.download = `${EXPORT_FILENAME_PREFIX}-${timestamp}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    } catch (error) {
+        console.error('下载导出数据失败:', error);
+        alert('下载失败，请尝试使用复制功能备份数据');
+    }
+}
+
+function handleImportFileChange(event) {
+    const file = event && event.target && event.target.files ? event.target.files[0] : null;
+    if (!file) {
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const importTextarea = document.getElementById('dataImportTextarea');
+        if (importTextarea) {
+            importTextarea.value = e.target.result;
+        }
+        highlightDataSection('dataImportSection');
+    };
+    reader.onerror = () => {
+        alert('读取文件失败，请重试或改用粘贴方式导入。');
+    };
+    reader.readAsText(file, 'utf-8');
+}
+
+function handleImportData() {
+    const importTextarea = document.getElementById('dataImportTextarea');
+    if (!importTextarea) {
+        return;
+    }
+
+    highlightDataSection('dataImportSection');
+
+    const raw = importTextarea.value.trim();
+    if (!raw) {
+        alert('请先粘贴备份内容或选择备份文件');
+        return;
+    }
+
+    try {
+        const parsed = JSON.parse(raw);
+        applyImportedData(parsed);
+    } catch (error) {
+        console.error('解析导入数据失败:', error);
+        alert(`导入失败：${error.message || '数据格式不正确'}`);
+    }
+}
+
+function applyImportedData(payload) {
+    if (!payload || typeof payload !== 'object') {
+        throw new Error('备份内容无效');
+    }
+
+    if (payload.version && payload.version > EXPORT_VERSION) {
+        console.warn('备份数据版本较新，尝试兼容导入');
+    }
+
+    const data = payload.data;
+    if (!data || typeof data !== 'object') {
+        throw new Error('备份缺少必要的数据字段');
+    }
+
+    const incomingTasks = data.tasksByDate;
+    if (!incomingTasks || typeof incomingTasks !== 'object' || !Object.keys(incomingTasks).length) {
+        throw new Error('未在备份中找到任务数据');
+    }
+
+    const normalizedTasksByDate = {};
+    Object.entries(incomingTasks).forEach(([dateKey, list]) => {
+        if (Array.isArray(list)) {
+            normalizedTasksByDate[dateKey] = list.map(normalizeTask);
+        }
+    });
+
+    if (!Object.keys(normalizedTasksByDate).length) {
+        throw new Error('任务数据为空或无法识别');
+    }
+
+    tasksByDate = normalizedTasksByDate;
+
+    const incomingPresets = Array.isArray(data.presetTasks) ? data.presetTasks : [];
+    presetTasks = incomingPresets.map(normalizeTask);
+
+    const historyData = data.history && typeof data.history === 'object' ? data.history : {};
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(historyData));
+
+    if (data.countdown && typeof data.countdown === 'object') {
+        localStorage.setItem(COUNTDOWN_KEY, JSON.stringify(data.countdown));
+    } else {
+        localStorage.removeItem(COUNTDOWN_KEY);
+    }
+
+    if (typeof data.background === 'string' && data.background) {
+        localStorage.setItem(BG_KEY, data.background);
+        const bgImg = document.getElementById('bg-image');
+        if (bgImg) {
+            bgImg.src = data.background;
+            bgImg.classList.add('active');
+        }
+    } else {
+        localStorage.removeItem(BG_KEY);
+        const bgImg = document.getElementById('bg-image');
+        if (bgImg) {
+            bgImg.src = '';
+            bgImg.classList.remove('active');
+        }
+    }
+
+    const theme = data.theme === 'light' ? 'light' : 'dark';
+    document.body.classList.toggle('light-theme', theme === 'light');
+    localStorage.setItem(THEME_KEY, theme);
+
+    const sidebarCollapsed = data.sidebarCollapsed === true;
+    applySidebarState(sidebarCollapsed);
+    localStorage.setItem(SIDEBAR_COLLAPSED_KEY, sidebarCollapsed ? '1' : '0');
+
+    const presetCollapsed = data.presetCollapsed === true;
+    applyPresetSidebarState(presetCollapsed);
+    localStorage.setItem(RIGHTBAR_COLLAPSED_KEY, presetCollapsed ? '1' : '0');
+
+    let lastActiveDate = typeof data.lastActiveDate === 'string' ? data.lastActiveDate : null;
+    if (!lastActiveDate || !tasksByDate[lastActiveDate]) {
+        const todayKey = getTodayKey();
+        if (tasksByDate[todayKey]) {
+            lastActiveDate = todayKey;
+        } else {
+            const availableDates = Object.keys(tasksByDate).sort();
+            lastActiveDate = availableDates[availableDates.length - 1];
+        }
+    }
+
+    selectedDateKey = lastActiveDate;
+    addModalTargetDate = selectedDateKey;
+    lastSystemDateKey = getTodayKey();
+
+    localStorage.setItem(LAST_ACTIVE_DATE_KEY, selectedDateKey);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(tasksByDate));
+
+    savePresetTasks();
+
+    Object.keys(tasksByDate).forEach(dateKey => updateHistoryForDate(dateKey));
+
+    setActiveDate(selectedDateKey, { skipRender: true });
+    renderTasks();
+    renderPresetTasks();
+    renderCalendar();
+    updateRings();
+    updateTaskStats();
+    updateCountdown();
+
+    closeDataModal();
+    alert('导入成功，数据已同步！');
+}
+
+function populateTaskFormFromData(task) {
+    if (!task) {
+        return;
+    }
+
+    const titleInput = document.getElementById('taskTitle');
+    if (titleInput) {
+        titleInput.value = task.title || '';
+    }
+
+    const descInput = document.getElementById('taskDesc');
+    if (descInput) {
+        descInput.value = task.description || '';
+    }
+
+    const iconInput = document.getElementById('taskIcon');
+    if (iconInput) {
+        iconInput.value = task.icon || '📝';
+        iconInput.dispatchEvent(new Event('input'));
+    }
+
+    const ringInputs = document.querySelectorAll('input[name="taskRings"]');
+    const ringSet = new Set(Array.isArray(task.rings) ? task.rings : []);
+    ringInputs.forEach(input => {
+        input.checked = ringSet.size ? ringSet.has(input.value) : input.value === 'health';
+    });
+
+    const ringValueInput = document.getElementById('taskRingValue');
+    if (ringValueInput) {
+        const value = Number(task.ringValue);
+        ringValueInput.value = Number.isFinite(value) ? value : DEFAULT_RING_VALUE;
+    }
 }
 
 document.getElementById('addTaskForm').addEventListener('submit', (e) => {
@@ -1233,31 +1661,64 @@ document.getElementById('addTaskForm').addEventListener('submit', (e) => {
     ringValue = Math.min(Math.max(ringValue, 1), RING_TARGET);
     ringValueInput.value = ringValue;
 
-    const basePayload = {
-        id: Date.now(),
+    const payloadFields = {
         title,
         description: document.getElementById('taskDesc').value.trim(),
         icon: document.getElementById('taskIcon').value || '📝',
-        completed: false,
         rings: selectedRings.length ? selectedRings : ['health'],
-        ringValue,
-        time: '自定义时间',
-        mood: '😊',
-        locked: false
+        ringValue
     };
 
-    if (addModalMode === 'preset') {
-        const preset = normalizeTask({ ...basePayload });
-        preset.completed = false;
-        preset.locked = false;
-        presetTasks.push({ ...preset, id: Date.now() + Math.floor(Math.random() * 1000) });
+    if (addModalMode === 'preset' || addModalMode === 'preset-edit') {
+        const normalized = normalizeTask({ ...payloadFields, completed: false, locked: false });
+
+        if (addModalMode === 'preset') {
+            presetTasks.push({ ...normalized, id: Date.now() + Math.floor(Math.random() * 1000) });
+        } else if (Number.isFinite(editingPresetId)) {
+            const index = presetTasks.findIndex(item => item.id === editingPresetId);
+            if (index !== -1) {
+                const existing = presetTasks[index];
+                presetTasks[index] = {
+                    ...normalizeTask({ ...existing, ...payloadFields }),
+                    id: existing.id,
+                    completed: false,
+                    locked: existing.locked === true
+                };
+            }
+        }
+
         savePresetTasks();
         renderPresetTasks();
     } else {
         const targetDate = addModalTargetDate || selectedDateKey;
         const taskList = ensureDateCollection(targetDate);
-        const newTask = normalizeTask({ ...basePayload, id: Date.now() + Math.floor(Math.random() * 1000) });
-        taskList.push(newTask);
+
+        if (addModalMode === 'task-edit' && Number.isFinite(editingTaskId)) {
+            const index = taskList.findIndex(item => item.id === editingTaskId);
+            if (index !== -1) {
+                const originalTask = taskList[index];
+                const updatedTask = normalizeTask({
+                    ...originalTask,
+                    ...payloadFields,
+                    id: originalTask.id,
+                    completed: originalTask.completed,
+                    locked: originalTask.locked,
+                    carryOverId: originalTask.carryOverId
+                });
+                taskList[index] = updatedTask;
+            }
+        } else {
+            const newTask = normalizeTask({
+                ...payloadFields,
+                id: Date.now() + Math.floor(Math.random() * 1000),
+                completed: false,
+                locked: false,
+                time: '自定义时间',
+                mood: '😊'
+            });
+            taskList.push(newTask);
+        }
+
         saveData(targetDate);
 
         if (targetDate === selectedDateKey) {
@@ -1282,6 +1743,30 @@ document.getElementById('countdownModal').addEventListener('click', (e) => {
         closeCountdownModal();
     }
 });
+
+const dataModalEl = document.getElementById('dataModal');
+if (dataModalEl) {
+    dataModalEl.addEventListener('click', (event) => {
+        if (event.target && event.target.id === 'dataModal') {
+            closeDataModal();
+        }
+    });
+}
+
+const dataCopyBtn = document.getElementById('dataCopyBtn');
+if (dataCopyBtn) {
+    dataCopyBtn.addEventListener('click', copyExportData);
+}
+
+const dataDownloadBtn = document.getElementById('dataDownloadBtn');
+if (dataDownloadBtn) {
+    dataDownloadBtn.addEventListener('click', downloadExportData);
+}
+
+const dataImportFileInput = document.getElementById('dataImportFile');
+if (dataImportFileInput) {
+    dataImportFileInput.addEventListener('change', handleImportFileChange);
+}
 
 function showConfirmDialog(message) {
     const modal = document.getElementById('confirmModal');
